@@ -90,15 +90,17 @@ sys_uptime(void)
   return xticks;
 }
 
-int sys_clone(void)
+int
+sys_clone(void)
 {
   int fcn, arg1, arg2, stack;
-  if(argint(0, &fcn)<0 || argint(1, &arg1)<0 || argint(2, &arg2)<0 || argint(3, &stack)<0)
+  if(argint(1, &fcn)<0 || argint(2, &arg1)<0 || argint(3, &arg2)<0 || argint(0, &stack)<0)
     return -1;
-  return clone((void *)fcn, (void *)arg1, (void *)arg2, (void *)stack);
+  return clone((void *)stack,(void *)fcn, (void *)arg1, (void *)arg2);
 }
 
-int sys_join(void)
+int
+sys_join(void)
 {
   void **stack;
   int stackArg;

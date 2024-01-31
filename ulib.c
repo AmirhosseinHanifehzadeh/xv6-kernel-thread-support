@@ -111,7 +111,7 @@ int thread_create(void (*start_routine)(void *, void *), void* arg1, void* arg2)
   void* stack;
   stack = malloc(PGSIZE);
 
-  return clone(start_routine, arg1, arg2, stack);
+  return clone(stack,start_routine, arg1, arg2);
 }
 
 int thread_join()
@@ -119,18 +119,4 @@ int thread_join()
   void * stackPtr;
   int x = join(&stackPtr);
   return x;
-}
-
-int lock_init(lock_t *lk)
-{
-  lk->flag = 0;
-  return 0;
-}
-
-void lock_acquire(lock_t *lk){
-  while(xchg(&lk->flag, 1) != 0);
-}
-
-void lock_release(lock_t *lk){
-	xchg(&lk->flag, 0);
 }
