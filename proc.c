@@ -267,6 +267,99 @@ exit(void)
   panic("zombie exit");
 }
 
+int clone(void* stack,void(*fcn)(void*,void*), void *arg1, void *arg2)
+{
+  struct proc *np;
+  struct proc *p = myproc();
+
+  if((np = allocproc()) == 0)
+    return -1;
+
+  np->pgdir = p->pgdir;
+  np->sz = p->sz;
+  np->parent = p;
+  *np->tf = *p->tf;
+
+  void * sarg1, *sarg2, *sret;
+
+  sret = stack + PGSIZE - 3 * sizeof(void *);
+  *(uint*)sret = 0xFFFFFFF;
+
+  sarg1 = stack + PGSIZE - 2 * sizeof(void *);
+  *(uint*)sarg1 = (uint)arg1;
+
+  sarg2 = stack + PGSIZE - 1 * sizeof(void *);
+  *(uint*)sarg2 = (uint)arg2;
+
+  np->tf->esp = (uint) stack;
+
+  np->threadstack = stack;
+
+  np->tf->esp += PGSIZE - 3 * sizeof(void*);
+  np->tf->ebp = np->tf->esp;
+
+  np->tf->eip = (uint) fcn;
+
+  np->tf->eax = 0;
+
+  int i;
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);
+
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+  acquire(&ptable.lock);
+
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+
+  return np->pid;
+}
+
+int join(void** stack)
+{
+  struct proc *p;
+  int havekids, pid;
+  struct proc *cp = myproc();
+  acquire(&ptable.lock);
+  for(;;){
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+
+      if(p->parent != cp || p->pgdir != p->parent->pgdir)
+        continue;
+
+      havekids = 1;
+      if(p->state == ZOMBIE){
+        pid = p->pid;
+
+        kfree(p->kstack);
+        p->kstack = 0;
+
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        p->threadstack = 0;
+
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+
+    if(!havekids || cp->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    sleep(cp, &ptable.lock); 
+  }
+}
+
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
